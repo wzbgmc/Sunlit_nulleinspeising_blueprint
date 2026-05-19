@@ -50,7 +50,7 @@ action:
       - conditions:
           - condition: numeric_state
             entity_id: !input shelly_power_sensor
-            below: 0  # negative Leistung = Einspeisung ins Netz
+            below: 0
           - condition: numeric_state
             entity_id: !input shelly_power_sensor
             below: -threshold
@@ -63,4 +63,4 @@ action:
       - service: mqtt.publish
         data:
           topic: !input mqtt_command_topic
-          payload: "normal"  # Payload für normalen Betrieb (je nach Wechselrichter anpassen)
+          payload: "normal"
