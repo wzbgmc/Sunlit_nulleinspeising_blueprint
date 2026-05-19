@@ -1,0 +1,66 @@
+blueprint:
+  name: Nulleinspeisung Sunlit Balkonspeicher mit Shelly3EMPro und Haymiles HM1500
+  description: Steuerung des Haymiles HM1500 Wechselrichters via MQTT zur Vermeidung von Netzeinspeisung.
+  domain: automation
+  input:
+    shelly_power_sensor:
+      name: Shelly3EMPro Leistungs-Sensor (W)
+      description: Sensor, der den aktuellen Gesamtverbrauch (positiv = Verbrauch, negativ = Einspeisung) anzeigt
+      selector:
+        entity:
+          domain: sensor
+    sunlit_storage_level:
+      name: Sunlit Speicherlevel Sensor (%)
+      description: Sensor, der den aktuellen Ladezustand des Speichers anzeigt
+      selector:
+        entity:
+          domain: sensor
+    mqtt_command_topic:
+      name: MQTT Topic für Wechselrichter Steuerung
+      description: MQTT Topic, auf das Steuerbefehle gesendet werden
+      selector:
+        text:
+    mqtt_payload_limit:
+      name: MQTT Payload für Einspeisung begrenzen (z.B. "limit_power")
+      description: Payload, um Einspeisung zu begrenzen (je nach Wechselrichter MQTT API)
+      default: "limit_power"
+      selector:
+        text:
+    feed_in_threshold:
+      name: Einspeisungsschwelle (W)
+      description: Schwellenwert, ab dem Einspeisung erkannt wird (z.B. 10 W)
+      default: 10
+      selector:
+        number:
+          min: 0
+          max: 1000
+          step: 1
+
+trigger:
+  - platform: state
+    entity_id: !input shelly_power_sensor
+
+variables:
+  power: "{{ states(input.shelly_power_sensor) | float }}"
+  storage_level: "{{ states(input.sunlit_storage_level) | float }}"
+  threshold: !input feed_in_threshold
+
+action:
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input shelly_power_sensor
+            below: 0  # negative Leistung = Einspeisung ins Netz
+          - condition: numeric_state
+            entity_id: !input shelly_power_sensor
+            below: -threshold
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: !input mqtt_command_topic
+              payload: !input mqtt_payload_limit
+    default:
+      - service: mqtt.publish
+        data:
+          topic: !input mqtt_command_topic
+          payload: "normal"  # Payload für normalen Betrieb (je nach Wechselrichter anpassen)
